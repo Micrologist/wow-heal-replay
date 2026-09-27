@@ -1,0 +1,74 @@
+# Runs scripts/wcl.ts on a GitHub runner, so live WCL calls don't depend on the
+# agent sandbox's shared egress IP (which WCL rate-limits per IP).
+# `dump` commits the fixture back to the branch the workflow was run on.
+name: wcl
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: Subcommand
+        type: choice
+        options: [whoami, schema, fights, dump]
+        default: whoami
+      report:
+        description: Report code or URL (fights, dump)
+        required: false
+      fight:
+        description: Fight ID (dump)
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wcl-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  wcl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      WCL_CLIENT_ID: ${{ secrets.WCL_CLIENT_ID }}
+      WCL_CLIENT_SECRET: ${{ secrets.WCL_CLIENT_SECRET }}
+      # Inputs go through env, never inline into the script, to avoid shell injection.
+      CMD: ${{ inputs.command }}
+      REPORT: ${{ inputs.report }}
+      FIGHT: ${{ inputs.fight }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Validate inputs
+        run: |
+          case "$CMD" in
+            whoami|schema) ;;
+            fights) [ -n "$REPORT" ] || { echo "report is required"; exit 1; } ;;
+            dump) [ -n "$REPORT" ] && [[ "$FIGHT" =~ ^[0-9]+$ ]] || { echo "report and numeric fight are required"; exit 1; } ;;
+          esac
+          if [ -n "$REPORT" ] && ! [[ "$REPORT" =~ ^[A-Za-z0-9:/.#?=\&_-]+$ ]]; then echo "bad report"; exit 1; fi
+
+      - name: Run
+        run: |
+          set -o pipefail
+          case "$CMD" in
+            whoami|schema) npm run --silent wcl -- "$CMD" ;;
+            fights) npm run --silent wcl -- fights "$REPORT" ;;
+            dump) npm run --silent wcl -- dump "$REPORT" "$FIGHT" ;;
+          esac | tee wcl-output.txt
+          { echo '```'; cat wcl-output.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit fixture
+        if: inputs.command == 'dump'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add fixtures/
+          git diff --cached --quiet && { echo "no fixture changes"; exit 0; }
+          git commit -m "Add WCL fixture: $REPORT fight $FIGHT"
+          git push
