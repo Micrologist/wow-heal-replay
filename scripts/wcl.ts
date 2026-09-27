@@ -6,6 +6,7 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { gzipSync } from "node:zlib";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { clientCredentialsTokenProvider } from "../src/api/auth.ts";
@@ -129,8 +130,9 @@ async function dump(input: string, fightArg: string | undefined) {
 
   const dir = join(ROOT, "fixtures");
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  const file = join(dir, `${slug(fight.name)}-${ref.code}-${fightID}.json`);
-  writeFileSync(file, JSON.stringify({ meta, report, fight, summaryTable, events }) + "\n");
+  // Gzipped: includeResources puts a stat snapshot on every event, so a 6-minute fight is ~70 MB of JSON.
+  const file = join(dir, `${slug(fight.name)}-${ref.code}-${fightID}.json.gz`);
+  writeFileSync(file, gzipSync(JSON.stringify({ meta, report, fight, summaryTable, events }) + "\n", { level: 9 }));
   console.log(`wrote ${file}`);
   console.log(`points spent: ${pointsSpent ?? "unknown (hour rolled over)"}; now ${after.pointsSpentThisHour}/${after.limitPerHour}`);
 }

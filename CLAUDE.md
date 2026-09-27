@@ -179,7 +179,7 @@ Exit criteria: a checked-in `fixtures/<encounter>.json`, a committed decision in
 3. Agent writes `scripts/wcl.ts` with three subcommands:
    - `whoami` — token exchange only; prints token expiry and the rate-limit data from `rateLimitData { limitPerHour pointsSpentThisHour }`. If this fails, stop and report: it's a secrets or egress problem, not code.
    - `fights <code>` — runs the report query from §4, prints the fight list. Confirms field names against the live schema.
-   - `dump <code> <fightID>` — fetches every dataType in §4 with paging, writes `fixtures/<encounter>-<code>-<fightID>.json` (raw responses, untouched) plus a `meta` block: fight duration, actor count, event counts per type, points spent.
+   - `dump <code> <fightID>` — fetches every dataType in §4 with paging, writes `fixtures/<encounter>-<code>-<fightID>.json.gz` (raw responses, untouched) plus a `meta` block: fight duration, actor count, event counts per type, points spent.
 4. Run `dump` on a kill and a wipe. Commit the fixtures. These are what `npm test` uses from now on; the script is never called by tests.
 
 **0b. Website access**
