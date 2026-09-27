@@ -164,7 +164,7 @@ docs/         screenshots of the Ellesmere frames/CDM for reference
 .env.example  WCL_CLIENT_ID= / WCL_CLIENT_SECRET=  (real values live in env secrets, never committed)
 ```
 
-Commands: `npm run dev` (Vite; smoke page at `/` — replaced by the app from Milestone 1, probe at `/scripts/cors-probe.html`), `npm test` (vitest, fixtures only), `npm run build` (typecheck + static build to `dist/`), `npm run wcl -- <subcommand>`.
+Commands: `npm run dev` (Vite; app at `/`, CORS probe at `/scripts/cors-probe.html`), `npm test` (vitest, fixtures only), `npm run build` (typecheck + static build to `dist/`), `npm run wcl -- <subcommand>`.
 CI (`.github/workflows/ci.yml`): test + build on every push/PR; pushes to `main` deploy `dist/` to GitHub Pages (Settings → Pages → Source: GitHub Actions).
 Fixtures are `fixtures/*.json.gz` (raw dump, gzipped; ~4.4 MB per 6–7 min Mythic fight vs ~70 MB raw).
 
@@ -201,7 +201,8 @@ Exit criteria: a checked-in `fixtures/<encounter>.json`, a committed decision in
 - `npm test` runs a client test with a mocked fetch that replays a fixture — proves the paging loop without network.
 - Manual check: the dev site loads the same fight the agent dumped and logs event counts matching the fixture `meta`. That's the proof both consumers see the same data.
 
-### 1. Fetch & list — paste report, fight list, IndexedDB cache. Nothing rendered yet.
+### 1. Fetch & list — paste report, fight list, IndexedDB cache. Nothing rendered yet. ✅ 2026-09-27
+`src/ui/app.ts`: credentials → report (URL/code, `#code=…&fight=…` hash) → fight list grouped by boss with pull numbers, kill/wipe %, duration, cached dot → load with progress bar → roster (healers from Summary `composition[].specs[].role`) + event counts. `src/api/fightData.ts` loads a fight as `FightData` (raw events flattened per dataType) through `src/api/cache.ts` (IndexedDB `fights` keyed `[code, fight.id]`, `reports` keyed by code; memory fallback). A cached fight re-opens with zero API requests; the report list is cached too, with a refresh link for live-logged reports. Tests: `fightDataFromDump` + `src/test/fixtures.ts` give model tests a `FightData` straight from a fixture.
 ### 2. Timeline core — HP + deaths from Healing/DamageTaken, tests against a fixture. Print `timeline.at(t)` to console.
 ### 3. Frames v0 — raid frames with moving health + deaths, scrubber, play/pause. This is the proof of concept; stop and look at it.
 ### 4. Debuffs + absorbs on frames.
@@ -228,6 +229,7 @@ Idea: take over one healer's slot and heal the replay yourself; the log's other 
 - Icons: `https://wow.zamimg.com/images/wow/icons/large/<icon>.jpg` from `masterData.abilities.icon`. Cache-friendly, no auth.
 - WCL API points: one fight is several event pages; don't refetch what's cached, and don't prefetch all fights in a report.
 - Private reports need the user-auth flow (authorization code), not client credentials. Out of scope for v1; show a clear error.
+- A cached fight is the raw events (~70 MB of objects for a 6–7 min Mythic fight) in IndexedDB. Fine for a handful of fights; add eviction if people cache dozens.
 
 ---
 

@@ -62,3 +62,14 @@ export interface EventPage {
   data: RawEvent[];
   nextPageTimestamp: number | null;
 }
+
+/** Everything one fight needs, as fetched (or read from cache). Events are the raw WCL objects,
+ * flattened across pages but otherwise untouched; `model/` owns their interpretation. */
+export interface FightData {
+  code: string;
+  report: Pick<Report, "code" | "title" | "startTime" | "endTime" | "zone" | "masterData">;
+  fight: ReportFight;
+  summaryTable: unknown;
+  events: Record<string, RawEvent[]>;
+  fetchedAt: number;
+}
