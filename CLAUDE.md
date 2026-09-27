@@ -219,7 +219,9 @@ Exit criteria: a checked-in `fixtures/<encounter>.json`, a committed decision in
 - Dead players produce no samples (gaps of minutes); alive players never went > 10 s without one in these fixtures, so `stale` is only exercised by synthetic tests.
 - Tick `i` = state at `i·100 ms` including only events ≤ that time; `at(t)` never shows the future.
 UI: a throwaway debug readout (slider + HP bars + death marks, `window.timeline`, `console.log(timeline.at(t))`) under the loaded fight; Milestone 3 replaces it with raid frames.
-### 3. Frames v0 — raid frames with moving health + deaths, scrubber, play/pause. This is the proof of concept; stop and look at it.
+### 3. Frames v0 — raid frames with moving health + deaths, scrubber, play/pause. This is the proof of concept; stop and look at it. ✅ built 2026-09-27, awaiting David's look
+`src/ui/replay.ts` = `controls/playback.ts` (play/pause, 0.25–8×, scrubber with clickable death markers → seek 3 s before, clock `m:ss.s / total`, keys: Space, ←/→ ±1 s, Shift ±10 s, 1–6 speed) + `frames/raidFrames.ts` (columns of 5, class-coloured fill via `scaleX`, outlined names, dead = grey + "Dead", stale = dimmed + "?"; only frames whose state changed are touched). Replaced the Milestone 2 debug readout; roster + event counts moved into collapsed `<details>`.
+Known gap: WCL doesn't give raid subgroups (needs `CombatantInfo` events, not fetched), so groups are filled by role order (tanks, healers, dps).
 ### 4. Debuffs + absorbs on frames.
 ### 5. Casts + healer panel — now-casting readout and recent heals. Frame highlighting.
 ### 6. Cooldowns — spell tables for one spec first (whichever spec is in your own logs), then the rest.
