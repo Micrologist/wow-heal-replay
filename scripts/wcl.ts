@@ -28,8 +28,9 @@ const DUMP_STREAMS: { dataType: EventDataType; hostilityType: HostilityType }[] 
 const DIFFICULTY: Record<number, string> = { 1: "LFR", 3: "Normal", 4: "Heroic", 5: "Mythic" };
 
 function makeClient() {
-  const id = process.env.WCL_CLIENT_ID;
-  const secret = process.env.WCL_CLIENT_SECRET;
+  // Trim: pasted secrets often carry a trailing newline, which WCL rejects as invalid_client.
+  const id = process.env.WCL_CLIENT_ID?.trim();
+  const secret = process.env.WCL_CLIENT_SECRET?.trim();
   if (!id || !secret) {
     console.error("WCL_CLIENT_ID / WCL_CLIENT_SECRET are not set (environment secrets or .env).");
     process.exit(2);
