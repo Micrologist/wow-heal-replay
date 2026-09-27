@@ -42,6 +42,8 @@ Static single-page app. No database. Two consumers of the WCL API, and **both mu
 1. **The website** (browser). Preferred: BYO credentials — user pastes their own WCL API client id + secret once, stored in `localStorage`, token fetched client-side via client-credentials grant, GraphQL called directly with the Bearer token. Zero infra, works on GitHub Pages. **Unverified assumption:** that WCL's `/oauth/token` endpoint accepts browser (CORS) requests. If it doesn't, fall back to a **token-only Cloudflare Worker**: the browser sends the user's own id+secret to the worker, the worker exchanges them for a token and returns it. The worker holds no secret of its own, so it's cheap to run and can't leak your API points.
 2. **The agent** (Claude Code, cloud sessions). Uses `WCL_CLIENT_ID` / `WCL_CLIENT_SECRET` from environment secrets via `scripts/wcl.ts` (Node, same auth + paging code as the browser client, different transport). Needs egress to `warcraftlogs.com` from the sandbox. Used for: dumping fixtures, smoke-testing paging, checking schema field names. Never for running the test suite — tests use fixtures only.
 
+**Decision (2026-09-27): BYO-direct, no worker.** `npm run wcl -- cors` (run via the workflow) showed WCL reflects any `Origin` in `Access-Control-Allow-Origin` and allows `authorization,content-type` on both `/oauth/token` and `/api/v2/client` (preflights 204; token and GraphQL responses carry the header too). Browser code: `src/api/browser.ts` (credentials in `localStorage`, token via Basic auth straight from WCL). Still to confirm in a real browser: open `scripts/cors-probe.html` from the Pages URL with real credentials; if that ever fails, the token-worker fallback above still applies.
+
 Shared code: `src/api/` is transport-agnostic (`WclClient(fetchImpl, tokenProvider)`); the browser and the Node script inject their own fetch and token source.
 
 Pipeline:
@@ -163,7 +165,9 @@ docs/         screenshots of the Ellesmere frames/CDM for reference
 .env.example  WCL_CLIENT_ID= / WCL_CLIENT_SECRET=  (real values live in env secrets, never committed)
 ```
 
-Commands (to define once the scaffold exists): `npm run dev`, `npm test`, `npm run build` (output is static → GitHub Pages), `npm run wcl -- <subcommand>`.
+Commands: `npm run dev` (Vite; smoke page at `/`, probe at `/scripts/cors-probe.html`), `npm test` (vitest, fixtures only), `npm run build` (typecheck + static build to `dist/`), `npm run wcl -- <subcommand>`.
+CI (`.github/workflows/ci.yml`): test + build on every push/PR; pushes to `main` deploy `dist/` to GitHub Pages (Settings → Pages → Source: GitHub Actions).
+Fixtures are `fixtures/*.json.gz` (raw dump, gzipped; ~4.4 MB per 6–7 min Mythic fight vs ~70 MB raw).
 
 ---
 

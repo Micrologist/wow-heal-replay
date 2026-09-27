@@ -12,23 +12,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { clientCredentialsTokenProvider, WCL_TOKEN_URL } from "../src/api/auth.ts";
 import { parseReportRef } from "../src/api/reportUrl.ts";
-import type { EventDataType, EventPage, HostilityType } from "../src/api/types.ts";
+import { DIFFICULTY, FIGHT_STREAMS } from "../src/api/streams.ts";
+import type { EventPage } from "../src/api/types.ts";
 import { WCL_API_URL, WclClient } from "../src/api/WclClient.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-
-// Every dataType from CLAUDE.md §4, all friendly-side.
-const DUMP_STREAMS: { dataType: EventDataType; hostilityType: HostilityType }[] = [
-  { dataType: "Healing", hostilityType: "Friendlies" },
-  { dataType: "DamageTaken", hostilityType: "Friendlies" },
-  { dataType: "Casts", hostilityType: "Friendlies" },
-  { dataType: "Buffs", hostilityType: "Friendlies" },
-  { dataType: "Debuffs", hostilityType: "Friendlies" },
-  { dataType: "Deaths", hostilityType: "Friendlies" },
-  { dataType: "Resources", hostilityType: "Friendlies" },
-];
-
-const DIFFICULTY: Record<number, string> = { 1: "LFR", 3: "Normal", 4: "Heroic", 5: "Mythic" };
 
 function makeClient() {
   // Trim: pasted secrets often carry a trailing newline, which WCL rejects as invalid_client.
@@ -96,7 +84,7 @@ async function dump(input: string, fightArg: string | undefined) {
   const events: Record<string, EventPage[]> = {};
   const eventCounts: Record<string, number> = {};
   const pageCounts: Record<string, number> = {};
-  for (const { dataType, hostilityType } of DUMP_STREAMS) {
+  for (const { dataType, hostilityType } of FIGHT_STREAMS) {
     const key = hostilityType === "Friendlies" ? dataType : `${dataType}:${hostilityType}`;
     const pages = await client.eventPages(
       { code: ref.code, fightID, dataType, hostilityType, startTime: fight.startTime, endTime: fight.endTime },

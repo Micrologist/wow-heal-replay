@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heal Replay</title>
+<link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+<main>
+  <h1>Heal Replay <span class="muted">— API smoke test</span></h1>
+  <p class="muted">Milestone 0: loads one fight through the same client the agent uses and prints event counts. Compare them with the fixture's <code>meta.eventCounts</code>.</p>
+
+  <form id="creds" class="panel">
+    <h2>WCL API client</h2>
+    <p class="muted">Create one at <a href="https://www.warcraftlogs.com/api/clients" target="_blank" rel="noopener">warcraftlogs.com/api/clients</a>. Stored in this browser only.</p>
+    <label>Client ID <input id="clientId" autocomplete="off" required></label>
+    <label>Client secret <input id="clientSecret" type="password" autocomplete="off" required></label>
+    <div class="row"><button>Save</button><button type="button" id="forget" class="secondary">Forget</button><span id="credsStatus" class="muted"></span></div>
+  </form>
+
+  <form id="load" class="panel">
+    <h2>Report</h2>
+    <label>Report URL or code <input id="report" placeholder="https://www.warcraftlogs.com/reports/…#fight=16" required></label>
+    <div class="row"><button>List fights</button><span id="loadStatus" class="muted"></span></div>
+  </form>
+
+  <section id="fights" class="panel" hidden></section>
+  <section id="result" class="panel" hidden></section>
+</main>
+<script type="module" src="./src/main.ts"></script>
+</body>
+</html>
