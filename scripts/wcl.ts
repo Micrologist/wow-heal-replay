@@ -4,6 +4,7 @@
 //   npm run wcl -- dump <code|url> <fightID>
 //   npm run wcl -- schema
 
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,8 +51,9 @@ function slug(s: string): string {
 
 async function whoami() {
   const { client, tokens } = makeClient();
-  // Lengths only, never values: enough to spot a swapped or truncated secret.
-  console.log(`client id: ${process.env.WCL_CLIENT_ID!.trim().length} chars, secret: ${process.env.WCL_CLIENT_SECRET!.trim().length} chars`);
+  // Lengths + short SHA-256 fingerprints, never values: enough to tell which secret differs between environments.
+  const fp = (v: string) => `${v.length} chars, sha256 ${createHash("sha256").update(v).digest("hex").slice(0, 8)}`;
+  console.log(`client id: ${fp(process.env.WCL_CLIENT_ID!.trim())}; secret: ${fp(process.env.WCL_CLIENT_SECRET!.trim())}`);
   await tokens();
   const expiresIn = tokens.lastResponse!.expires_in;
   console.log(`token ok: ${tokens.lastResponse!.token_type}, expires in ${expiresIn}s (~${Math.round(expiresIn / 86400)} days)`);
