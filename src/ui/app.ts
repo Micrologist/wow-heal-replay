@@ -9,9 +9,11 @@ import { DIFFICULTY } from "../api/streams.ts";
 import type { FightData, Report, ReportFight } from "../api/types.ts";
 import classColors from "../data/classColors.json";
 import { buildRoster, type Player, type Role } from "../model/roster.ts";
+import { buildTimeline } from "../model/timeline.ts";
 import { fmtAgo, fmtDuration, h } from "./dom.ts";
 import { friendlyError } from "./errors.ts";
 import { formatHash, parseHash } from "./hashState.ts";
+import { timelineDebug } from "./timelineDebug.ts";
 
 const COLORS = classColors as Record<string, string>;
 
@@ -227,7 +229,8 @@ export function startApp(root: HTMLElement, store: FightStore, persistentCache: 
         h("summary", null, `${total.toLocaleString("en-US")} events`),
         h("table", null, h("tbody", null, ...Object.entries(data.events).map(([k, v]) =>
           h("tr", null, h("td", null, k), h("td", { class: "num" }, v.length.toLocaleString("en-US"))))))),
-      h("p", { class: "muted small" }, "Replay (raid frames, healer panels) comes in the next milestones."),
+      timelineDebug(buildTimeline(data)),
+      h("p", { class: "muted small" }, "Raid frames and healer panels come in the next milestones."),
     );
   }
 

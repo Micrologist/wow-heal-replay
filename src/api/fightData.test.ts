@@ -33,14 +33,16 @@ describe("loadFightData", () => {
 describe("IdbFightStore", () => {
   it("round-trips fights and reports, keyed by (code, fightID)", async () => {
     const store = await IdbFightStore.open(indexedDB, `test-${Math.random()}`);
-    const data = fightDataFromDump(dump);
+    // Trimmed: this checks keying and the round trip, not IndexedDB throughput (a full fight is ~70 MB).
+    const full = fightDataFromDump(dump);
+    const data = { ...full, events: Object.fromEntries(Object.entries(full.events).map(([k, v]) => [k, v.slice(0, 500)])) };
 
     expect(await store.getFight(data.code, data.fight.id)).toBeUndefined();
     await store.putFight(data);
     await store.putFight({ ...data, code: "otherReport" });
 
     const back = await store.getFight(data.code, data.fight.id);
-    expect(back?.events.Healing.length).toBe(dump.meta.eventCounts.Healing);
+    expect(back?.events.Healing).toEqual(data.events.Healing);
     expect(await store.cachedFightIDs(data.code)).toEqual([data.fight.id]);
 
     await store.deleteFight(data.code, data.fight.id);

@@ -47,3 +47,19 @@ progress::-moz-progress-bar { background: var(--accent); }
 details summary { cursor: pointer; color: var(--muted); }
 table { border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
 td { padding: 2px 12px 2px 0; } td.num { text-align: right; }
+
+/* Milestone 2 timeline debug readout */
+.debug { display: grid; gap: 8px; }
+.debug[open] { gap: 8px; }
+.clock { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 5ch; }
+.scrubwrap { position: relative; padding-bottom: 8px; }
+.scrub { width: 100%; margin: 0; }
+.marks { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; }
+.mark { position: absolute; width: 2px; height: 6px; background: var(--bad); transform: translateX(-1px); }
+.hpgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 3px 16px; }
+.hprow { display: grid; grid-template-columns: 9ch 1fr 5ch; gap: 8px; align-items: center; font-size: 12px; }
+.hprow .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.hprow .bar { height: 10px; background: #0b0c0f; border: 1px solid var(--border); }
+.hprow .fill { height: 100%; }
+.hprow .muted { text-align: right; font-variant-numeric: tabular-nums; }
+.hprow.dead { opacity: .45; }
