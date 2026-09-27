@@ -229,6 +229,8 @@ Idea: take over one healer's slot and heal the replay yourself; the log's other 
 ## 11. Notes for Claude Code
 
 - Live WCL access is via `npm run wcl -- …` with `WCL_CLIENT_ID` / `WCL_CLIENT_SECRET` from the environment. If they're missing or `whoami` fails, say so and stop — don't work around it, don't ask for the secret in chat, don't hardcode anything.
+- `npm run wcl` passes `--use-env-proxy` so Node's `fetch` goes through the sandbox's `HTTPS_PROXY` (without it: 403 "Host not in allowlist"). `npm run wcl -- schema` dumps introspection for the types we use.
+- WCL also rate-limits per IP (429 with a long `Retry-After`, independent of API points). The client fails fast on that; wait it out rather than retrying.
 - Live calls are for fixtures and schema checks only. `npm test` must pass with the network off.
 - Each `dump` costs API points; check `pointsSpentThisHour` in `whoami` before dumping more than a couple of fights.
 - Keep `model/` free of DOM and fetch — pure functions over event arrays, tested with fixtures.
