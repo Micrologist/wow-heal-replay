@@ -48,18 +48,35 @@ details summary { cursor: pointer; color: var(--muted); }
 table { border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
 td { padding: 2px 12px 2px 0; } td.num { text-align: right; }
 
-/* Milestone 2 timeline debug readout */
-.debug { display: grid; gap: 8px; }
-.debug[open] { gap: 8px; }
-.clock { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 5ch; }
-.scrubwrap { position: relative; padding-bottom: 8px; }
-.scrub { width: 100%; margin: 0; }
-.marks { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; }
-.mark { position: absolute; width: 2px; height: 6px; background: var(--bad); transform: translateX(-1px); }
-.hpgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 3px 16px; }
-.hprow { display: grid; grid-template-columns: 9ch 1fr 5ch; gap: 8px; align-items: center; font-size: 12px; }
-.hprow .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.hprow .bar { height: 10px; background: #0b0c0f; border: 1px solid var(--border); }
-.hprow .fill { height: 100%; }
-.hprow .muted { text-align: right; font-variant-numeric: tabular-nums; }
-.hprow.dead { opacity: .45; }
+/* Replay: playback controls */
+.replay { display: grid; gap: 10px; }
+.playback { display: grid; gap: 6px; }
+.pb-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pb-play { width: 40px; font-size: 13px; }
+.pb-clock { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 13ch; }
+.pb-speeds { display: flex; gap: 2px; margin-left: auto; }
+.pb-speed { background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); padding: 3px 7px; font-size: 12px; }
+.pb-speed.active { color: #fff; border-color: var(--accent); }
+.pb-track { position: relative; padding-top: 10px; }
+.pb-scrub { width: 100%; margin: 0; accent-color: var(--accent); }
+/* inset by half the range thumb so markers line up with the thumb's position */
+.pb-marks { position: absolute; left: 8px; right: 8px; top: 0; height: 9px; }
+.pb-mark { position: absolute; top: 0; width: 3px; height: 9px; padding: 0; border-radius: 0; background: var(--bad); transform: translateX(-1px); }
+
+/* Raid frames (Ellesmere-ish): columns of 5, dark frames, class-coloured fill */
+.raid-frames { display: flex; gap: 6px; flex-wrap: wrap; }
+.rf-group { display: grid; grid-auto-rows: 38px; gap: 2px; width: 118px; }
+.rf-frame { position: relative; background: #121212; border: 1px solid #000; outline: 1px solid #2b2b2b; overflow: hidden; }
+.rf-fill { position: absolute; inset: 0; transform-origin: left; transform: scaleX(1); }
+.rf-name { position: absolute; left: 4px; right: 4px; top: 3px; font-size: 11px; font-weight: 600; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 1px #000; }
+.rf-status { position: absolute; left: 0; right: 0; bottom: 3px; text-align: center; font-size: 11px; color: #bbb;
+  text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000; }
+.rf-frame.dead { background: #262626; }
+.rf-frame.dead .rf-name { color: #8a8a8a; }
+.rf-frame.stale { opacity: .55; }
+@media (max-width: 520px) {
+  .raid-frames { gap: 4px; }
+  .rf-group { width: calc((100vw - 32px - 26px - 12px) / 4); grid-auto-rows: 34px; }
+}

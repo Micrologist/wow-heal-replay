@@ -13,7 +13,7 @@ import { buildTimeline } from "../model/timeline.ts";
 import { fmtAgo, fmtDuration, h } from "./dom.ts";
 import { friendlyError } from "./errors.ts";
 import { formatHash, parseHash } from "./hashState.ts";
-import { timelineDebug } from "./timelineDebug.ts";
+import { createReplay, type Replay } from "./replay.ts";
 
 const COLORS = classColors as Record<string, string>;
 
@@ -152,7 +152,11 @@ export function startApp(root: HTMLElement, store: FightStore, persistentCache: 
   }
 
   // ---- one fight ----
+  let replay: Replay | null = null;
+
   async function openFight(fight: ReportFight) {
+    replay?.dispose();
+    replay = null;
     const report = state.report!;
     const seq = ++state.loadSeq;
     state.selectedFight = fight.id;
@@ -207,6 +211,7 @@ export function startApp(root: HTMLElement, store: FightStore, persistentCache: 
     const roster = buildRoster(data);
     const byRole = (role: Role) => roster.filter((p) => p.role === role);
     const total = Object.values(data.events).reduce((n, e) => n + e.length, 0);
+    replay = createReplay(buildTimeline(data));
     fightEl.replaceChildren(
       fightTitle(data.fight),
       h("p", { class: "muted small" },
@@ -220,17 +225,18 @@ export function startApp(root: HTMLElement, store: FightStore, persistentCache: 
           void openFight(data.fight);
         } } }, "re-fetch"),
       ),
-      h("div", { class: "roster" },
-        rosterGroup("Healers", byRole("healer"), true),
-        rosterGroup("Tanks", byRole("tank")),
-        rosterGroup("DPS", [...byRole("dps"), ...byRole("unknown")]),
-      ),
+      replay.el,
+      h("details", null,
+        h("summary", null, `Roster · ${roster.length} players, ${byRole("healer").length} healers`),
+        h("div", { class: "roster" },
+          rosterGroup("Healers", byRole("healer"), true),
+          rosterGroup("Tanks", byRole("tank")),
+          rosterGroup("DPS", [...byRole("dps"), ...byRole("unknown")]),
+        )),
       h("details", null,
         h("summary", null, `${total.toLocaleString("en-US")} events`),
         h("table", null, h("tbody", null, ...Object.entries(data.events).map(([k, v]) =>
           h("tr", null, h("td", null, k), h("td", { class: "num" }, v.length.toLocaleString("en-US"))))))),
-      timelineDebug(buildTimeline(data)),
-      h("p", { class: "muted small" }, "Raid frames and healer panels come in the next milestones."),
     );
   }
 
