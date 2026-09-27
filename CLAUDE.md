@@ -39,10 +39,10 @@ Paste a Warcraft Logs report, pick a raid encounter, and watch it back from a he
 
 Static single-page app. No database. Two consumers of the WCL API, and **both must be proven working before any UI is built** (see Milestone 0):
 
-1. **The website** (browser). Preferred: BYO credentials — user pastes their own WCL API client id + secret once, stored in `localStorage`, token fetched client-side via client-credentials grant, GraphQL called directly with the Bearer token. Zero infra, works on GitHub Pages. **Unverified assumption:** that WCL's `/oauth/token` endpoint accepts browser (CORS) requests. If it doesn't, fall back to a **token-only Cloudflare Worker**: the browser sends the user's own id+secret to the worker, the worker exchanges them for a token and returns it. The worker holds no secret of its own, so it's cheap to run and can't leak your API points.
+1. **The website** (browser). Preferred: BYO credentials — user pastes their own WCL API client id + secret once, stored in `localStorage`, token fetched client-side via client-credentials grant, GraphQL called directly with the Bearer token. Zero infra, works on GitHub Pages.
 2. **The agent** (Claude Code, cloud sessions). Uses `WCL_CLIENT_ID` / `WCL_CLIENT_SECRET` from environment secrets via `scripts/wcl.ts` (Node, same auth + paging code as the browser client, different transport). Needs egress to `warcraftlogs.com` from the sandbox. Used for: dumping fixtures, smoke-testing paging, checking schema field names. Never for running the test suite — tests use fixtures only.
 
-**Decision (2026-09-27): BYO-direct, no worker.** `npm run wcl -- cors` (run via the workflow) showed WCL reflects any `Origin` in `Access-Control-Allow-Origin` and allows `authorization,content-type` on both `/oauth/token` and `/api/v2/client` (preflights 204; token and GraphQL responses carry the header too). Browser code: `src/api/browser.ts` (credentials in `localStorage`, token via Basic auth straight from WCL). Still to confirm in a real browser: open `scripts/cors-probe.html` from the Pages URL with real credentials; if that ever fails, the token-worker fallback above still applies.
+**Decision (2026-09-27): BYO-direct, no worker — confirmed in a real browser.** `npm run wcl -- cors` (run via the workflow) showed WCL reflects any `Origin` in `Access-Control-Allow-Origin` and allows `authorization,content-type` on both `/oauth/token` and `/api/v2/client` (preflights 204; token and GraphQL responses carry the header too). Browser code: `src/api/browser.ts` (credentials in `localStorage`, token via Basic auth straight from WCL). David ran `scripts/cors-probe.html` from the Pages origin with real credentials (token exchange + GraphQL OK), and the deployed smoke page loaded report `368AMJNcyTLkrPvz` fight #16 with the same event counts as the fixture. If WCL ever drops CORS, the fallback is a token-exchange-only Cloudflare Worker (browser sends the user's id+secret, worker returns the token, holds no secret itself).
 
 Shared code: `src/api/` is transport-agnostic (`WclClient(fetchImpl, tokenProvider)`); the browser and the Node script inject their own fetch and token source.
 
@@ -159,13 +159,12 @@ src/
 scripts/
   wcl.ts      Node CLI: `whoami`, `fights <code>`, `dump <code> <fightID>` → fixtures/
   cors-probe.html  one-file page that tries the token exchange from the browser
-worker/       (only if Milestone 0 says it's needed) token-exchange Cloudflare Worker
 fixtures/     one raw-events dump per encounter used in tests
 docs/         screenshots of the Ellesmere frames/CDM for reference
 .env.example  WCL_CLIENT_ID= / WCL_CLIENT_SECRET=  (real values live in env secrets, never committed)
 ```
 
-Commands: `npm run dev` (Vite; smoke page at `/`, probe at `/scripts/cors-probe.html`), `npm test` (vitest, fixtures only), `npm run build` (typecheck + static build to `dist/`), `npm run wcl -- <subcommand>`.
+Commands: `npm run dev` (Vite; smoke page at `/` — replaced by the app from Milestone 1, probe at `/scripts/cors-probe.html`), `npm test` (vitest, fixtures only), `npm run build` (typecheck + static build to `dist/`), `npm run wcl -- <subcommand>`.
 CI (`.github/workflows/ci.yml`): test + build on every push/PR; pushes to `main` deploy `dist/` to GitHub Pages (Settings → Pages → Source: GitHub Actions).
 Fixtures are `fixtures/*.json.gz` (raw dump, gzipped; ~4.4 MB per 6–7 min Mythic fight vs ~70 MB raw).
 
@@ -173,7 +172,9 @@ Fixtures are `fixtures/*.json.gz` (raw dump, gzipped; ~4.4 MB per 6–7 min Myth
 
 ## 8. Milestones
 
-### 0. Prove API access — for the agent *and* the site. Nothing else until this is green.
+### 0. Prove API access — for the agent *and* the site. ✅ Done 2026-09-27.
+
+Fixtures: Nek'zali the Soulcoiler Mythic kill (#16) + wipe (#15) from `368AMJNcyTLkrPvz`. Decision: BYO-direct (§3). Agent path: `wcl` workflow. Site path: Pages smoke page. Details below kept for reference.
 
 Exit criteria: a checked-in `fixtures/<encounter>.json`, a committed decision in this file (§3) on BYO-direct vs token-worker, and both paths exercised end to end.
 
