@@ -3,16 +3,17 @@
 //   npm run wcl -- fights <code|url>
 //   npm run wcl -- dump <code|url> <fightID>
 //   npm run wcl -- schema
+//   npm run wcl -- cors [origin...]   (unauthenticated CORS header check, costs no points)
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { clientCredentialsTokenProvider } from "../src/api/auth.ts";
+import { clientCredentialsTokenProvider, WCL_TOKEN_URL } from "../src/api/auth.ts";
 import { parseReportRef } from "../src/api/reportUrl.ts";
 import type { EventDataType, EventPage, HostilityType } from "../src/api/types.ts";
-import { WclClient } from "../src/api/WclClient.ts";
+import { WCL_API_URL, WclClient } from "../src/api/WclClient.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -142,6 +143,51 @@ async function schema() {
   console.log(JSON.stringify(await client.schema(), null, 2));
 }
 
+// What a browser on `origin` would be allowed to do. Sends only preflights and a token request with
+// bogus credentials, so it needs no secrets and spends no API points.
+async function cors(origins: string[]) {
+  const probes: { name: string; url: string; init: RequestInit }[] = [
+    {
+      name: "token preflight (Basic auth header)",
+      url: WCL_TOKEN_URL,
+      init: { method: "OPTIONS", headers: { "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "authorization,content-type" } },
+    },
+    {
+      name: "token POST, creds in body (no preflight needed)",
+      url: WCL_TOKEN_URL,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "grant_type=client_credentials&client_id=cors-probe&client_secret=cors-probe",
+      },
+    },
+    {
+      name: "GraphQL preflight",
+      url: WCL_API_URL,
+      init: { method: "OPTIONS", headers: { "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "authorization,content-type" } },
+    },
+    {
+      name: "GraphQL POST, bogus token",
+      url: WCL_API_URL,
+      init: {
+        method: "POST",
+        headers: { Authorization: "Bearer cors-probe", "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "{ rateLimitData { limitPerHour } }" }),
+      },
+    },
+  ];
+  for (const origin of origins) {
+    console.log(`\n== Origin: ${origin}`);
+    for (const p of probes) {
+      const res = await fetch(p.url, { ...p.init, headers: { ...(p.init.headers as Record<string, string>), Origin: origin } });
+      const acHeaders = [...res.headers].filter(([k]) => k.startsWith("access-control-"));
+      console.log(`  ${p.name}: HTTP ${res.status}`);
+      if (acHeaders.length === 0) console.log("    (no access-control-* headers)");
+      for (const [k, v] of acHeaders) console.log(`    ${k}: ${v}`);
+    }
+  }
+}
+
 async function main() {
   // Local runs can use a .env file; cloud sessions get the vars from environment secrets.
   const envFile = join(ROOT, ".env");
@@ -159,8 +205,10 @@ async function main() {
       return dump(args[0], args[1]);
     case "schema":
       return schema();
+    case "cors":
+      return cors(args.length ? args : ["https://micrologist.github.io", "http://localhost:5173"]);
     default:
-      console.error("usage: npm run wcl -- <whoami | fights <code> | dump <code> <fightID> | schema>");
+      console.error("usage: npm run wcl -- <whoami | fights <code> | dump <code> <fightID> | schema | cors [origin...]>");
       process.exit(1);
   }
 }
