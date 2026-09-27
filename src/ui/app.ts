@@ -8,6 +8,7 @@ import { parseReportRef } from "../api/reportUrl.ts";
 import { DIFFICULTY } from "../api/streams.ts";
 import type { FightData, Report, ReportFight } from "../api/types.ts";
 import classColors from "../data/classColors.json";
+import { encounterData } from "../data/encounters.ts";
 import { buildRoster, type Player, type Role } from "../model/roster.ts";
 import { buildTimeline } from "../model/timeline.ts";
 import { fmtAgo, fmtDuration, h } from "./dom.ts";
@@ -211,7 +212,7 @@ export function startApp(root: HTMLElement, store: FightStore, persistentCache: 
     const roster = buildRoster(data);
     const byRole = (role: Role) => roster.filter((p) => p.role === role);
     const total = Object.values(data.events).reduce((n, e) => n + e.length, 0);
-    replay = createReplay(buildTimeline(data));
+    replay = createReplay(buildTimeline(data, { debuffs: encounterData(data.fight.encounterID)?.debuffs }));
     fightEl.replaceChildren(
       fightTitle(data.fight),
       h("p", { class: "muted small" },
