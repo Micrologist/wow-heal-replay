@@ -4,6 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
     "wcl": "tsx --use-env-proxy --disable-warning=UNDICI-EHPA scripts/wcl.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
@@ -12,6 +15,7 @@
     "@types/node": "^26.6.3",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
+    "vite": "^8.3.1",
     "vitest": "^5.0.2"
   }
 }

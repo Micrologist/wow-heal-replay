@@ -9,7 +9,7 @@ on:
       command:
         description: Subcommand
         type: choice
-        options: [whoami, schema, fights, dump]
+        options: [whoami, schema, fights, dump, cors]
         default: whoami
       report:
         description: Report code or URL (fights, dump)
@@ -47,7 +47,7 @@ jobs:
       - name: Validate inputs
         run: |
           case "$CMD" in
-            whoami|schema) ;;
+            whoami|schema|cors) ;;
             fights) [ -n "$REPORT" ] || { echo "report is required"; exit 1; } ;;
             dump) [ -n "$REPORT" ] && [[ "$FIGHT" =~ ^[0-9]+$ ]] || { echo "report and numeric fight are required"; exit 1; } ;;
           esac
@@ -57,7 +57,7 @@ jobs:
         run: |
           set -o pipefail
           case "$CMD" in
-            whoami|schema) npm run --silent wcl -- "$CMD" ;;
+            whoami|schema|cors) npm run --silent wcl -- "$CMD" ;;
             fights) npm run --silent wcl -- fights "$REPORT" ;;
             dump) npm run --silent wcl -- dump "$REPORT" "$FIGHT" ;;
           esac | tee wcl-output.txt

@@ -3,33 +3,25 @@
 //   npm run wcl -- fights <code|url>
 //   npm run wcl -- dump <code|url> <fightID>
 //   npm run wcl -- schema
+//   npm run wcl -- cors [origin...]   (unauthenticated CORS header check, costs no points)
 
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { gzipSync } from "node:zlib";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { clientCredentialsTokenProvider } from "../src/api/auth.ts";
+import { clientCredentialsTokenProvider, WCL_TOKEN_URL } from "../src/api/auth.ts";
 import { parseReportRef } from "../src/api/reportUrl.ts";
-import type { EventDataType, EventPage, HostilityType } from "../src/api/types.ts";
-import { WclClient } from "../src/api/WclClient.ts";
+import { DIFFICULTY, FIGHT_STREAMS } from "../src/api/streams.ts";
+import type { EventPage } from "../src/api/types.ts";
+import { WCL_API_URL, WclClient } from "../src/api/WclClient.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-// Every dataType from CLAUDE.md §4, all friendly-side.
-const DUMP_STREAMS: { dataType: EventDataType; hostilityType: HostilityType }[] = [
-  { dataType: "Healing", hostilityType: "Friendlies" },
-  { dataType: "DamageTaken", hostilityType: "Friendlies" },
-  { dataType: "Casts", hostilityType: "Friendlies" },
-  { dataType: "Buffs", hostilityType: "Friendlies" },
-  { dataType: "Debuffs", hostilityType: "Friendlies" },
-  { dataType: "Deaths", hostilityType: "Friendlies" },
-  { dataType: "Resources", hostilityType: "Friendlies" },
-];
-
-const DIFFICULTY: Record<number, string> = { 1: "LFR", 3: "Normal", 4: "Heroic", 5: "Mythic" };
-
 function makeClient() {
-  const id = process.env.WCL_CLIENT_ID;
-  const secret = process.env.WCL_CLIENT_SECRET;
+  // Trim: pasted secrets often carry a trailing newline, which WCL rejects as invalid_client.
+  const id = process.env.WCL_CLIENT_ID?.trim();
+  const secret = process.env.WCL_CLIENT_SECRET?.trim();
   if (!id || !secret) {
     console.error("WCL_CLIENT_ID / WCL_CLIENT_SECRET are not set (environment secrets or .env).");
     process.exit(2);
@@ -49,6 +41,9 @@ function slug(s: string): string {
 
 async function whoami() {
   const { client, tokens } = makeClient();
+  // Lengths + short SHA-256 fingerprints, never values: enough to tell which secret differs between environments.
+  const fp = (v: string) => `${v.length} chars, sha256 ${createHash("sha256").update(v).digest("hex").slice(0, 8)}`;
+  console.log(`client id: ${fp(process.env.WCL_CLIENT_ID!.trim())}; secret: ${fp(process.env.WCL_CLIENT_SECRET!.trim())}`);
   await tokens();
   const expiresIn = tokens.lastResponse!.expires_in;
   console.log(`token ok: ${tokens.lastResponse!.token_type}, expires in ${expiresIn}s (~${Math.round(expiresIn / 86400)} days)`);
@@ -89,7 +84,7 @@ async function dump(input: string, fightArg: string | undefined) {
   const events: Record<string, EventPage[]> = {};
   const eventCounts: Record<string, number> = {};
   const pageCounts: Record<string, number> = {};
-  for (const { dataType, hostilityType } of DUMP_STREAMS) {
+  for (const { dataType, hostilityType } of FIGHT_STREAMS) {
     const key = hostilityType === "Friendlies" ? dataType : `${dataType}:${hostilityType}`;
     const pages = await client.eventPages(
       { code: ref.code, fightID, dataType, hostilityType, startTime: fight.startTime, endTime: fight.endTime },
@@ -124,8 +119,9 @@ async function dump(input: string, fightArg: string | undefined) {
 
   const dir = join(ROOT, "fixtures");
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  const file = join(dir, `${slug(fight.name)}-${ref.code}-${fightID}.json`);
-  writeFileSync(file, JSON.stringify({ meta, report, fight, summaryTable, events }) + "\n");
+  // Gzipped: includeResources puts a stat snapshot on every event, so a 6-minute fight is ~70 MB of JSON.
+  const file = join(dir, `${slug(fight.name)}-${ref.code}-${fightID}.json.gz`);
+  writeFileSync(file, gzipSync(JSON.stringify({ meta, report, fight, summaryTable, events }) + "\n", { level: 9 }));
   console.log(`wrote ${file}`);
   console.log(`points spent: ${pointsSpent ?? "unknown (hour rolled over)"}; now ${after.pointsSpentThisHour}/${after.limitPerHour}`);
 }
@@ -133,6 +129,51 @@ async function dump(input: string, fightArg: string | undefined) {
 async function schema() {
   const { client } = makeClient();
   console.log(JSON.stringify(await client.schema(), null, 2));
+}
+
+// What a browser on `origin` would be allowed to do. Sends only preflights and a token request with
+// bogus credentials, so it needs no secrets and spends no API points.
+async function cors(origins: string[]) {
+  const probes: { name: string; url: string; init: RequestInit }[] = [
+    {
+      name: "token preflight (Basic auth header)",
+      url: WCL_TOKEN_URL,
+      init: { method: "OPTIONS", headers: { "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "authorization,content-type" } },
+    },
+    {
+      name: "token POST, creds in body (no preflight needed)",
+      url: WCL_TOKEN_URL,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "grant_type=client_credentials&client_id=cors-probe&client_secret=cors-probe",
+      },
+    },
+    {
+      name: "GraphQL preflight",
+      url: WCL_API_URL,
+      init: { method: "OPTIONS", headers: { "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "authorization,content-type" } },
+    },
+    {
+      name: "GraphQL POST, bogus token",
+      url: WCL_API_URL,
+      init: {
+        method: "POST",
+        headers: { Authorization: "Bearer cors-probe", "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "{ rateLimitData { limitPerHour } }" }),
+      },
+    },
+  ];
+  for (const origin of origins) {
+    console.log(`\n== Origin: ${origin}`);
+    for (const p of probes) {
+      const res = await fetch(p.url, { ...p.init, headers: { ...(p.init.headers as Record<string, string>), Origin: origin } });
+      const acHeaders = [...res.headers].filter(([k]) => k.startsWith("access-control-"));
+      console.log(`  ${p.name}: HTTP ${res.status}`);
+      if (acHeaders.length === 0) console.log("    (no access-control-* headers)");
+      for (const [k, v] of acHeaders) console.log(`    ${k}: ${v}`);
+    }
+  }
 }
 
 async function main() {
@@ -152,8 +193,10 @@ async function main() {
       return dump(args[0], args[1]);
     case "schema":
       return schema();
+    case "cors":
+      return cors(args.length ? args : ["https://micrologist.github.io", "http://localhost:5173"]);
     default:
-      console.error("usage: npm run wcl -- <whoami | fights <code> | dump <code> <fightID> | schema>");
+      console.error("usage: npm run wcl -- <whoami | fights <code> | dump <code> <fightID> | schema | cors [origin...]>");
       process.exit(1);
   }
 }

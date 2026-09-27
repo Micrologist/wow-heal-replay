@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WCL CORS Probe</title>
+<style>
+  :root { --bg: #111317; --panel: #1b1e24; --text: #e6e6e6; --muted: #8b93a1; --ok: #4caf50; --bad: #e5534b; --border: #2c313a; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p { color: var(--muted); margin: 0 0 16px; }
+  form { display: grid; gap: 8px; background: var(--panel); border: 1px solid var(--border); padding: 12px; border-radius: 6px; }
+  label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
+  input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; font: inherit; }
+  button { justify-self: start; background: #2d6cdf; color: white; border: 0; border-radius: 4px; padding: 8px 14px; font: inherit; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .step { margin-top: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
+  .step h2 { font-size: 14px; margin: 0 0 6px; display: flex; gap: 8px; align-items: center; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  pre { margin: 0; white-space: pre-wrap; word-break: break-all; font-size: 12px; color: var(--muted); }
+  #verdict { margin-top: 12px; font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>WCL CORS probe</h1>
+  <p>Tries the client-credentials token exchange and one GraphQL query from this page's origin (<span id="origin"></span>). Credentials stay in this tab; nothing is stored.</p>
+  <form id="form">
+    <label>Client ID <input id="id" autocomplete="off" required></label>
+    <label>Client secret <input id="secret" type="password" autocomplete="off" required></label>
+    <button id="run">Run probe</button>
+  </form>
+  <div id="out"></div>
+  <div id="verdict"></div>
+</main>
+<script>
+  const TOKEN_URL = "https://www.warcraftlogs.com/oauth/token";
+  const API_URL = "https://www.warcraftlogs.com/api/v2/client";
+  const $ = (id) => document.getElementById(id);
+  $("origin").textContent = location.origin;
+
+  function step(title, ok, detail) {
+    const div = document.createElement("div");
+    div.className = "step";
+    div.innerHTML = `<h2><span class="${ok ? "ok" : "bad"}">${ok ? "✔" : "✘"}</span></h2><pre></pre>`;
+    div.querySelector("h2").append(title);
+    div.querySelector("pre").textContent = detail;
+    $("out").append(div);
+  }
+
+  // Returns {ok, status, body} or {error} when the browser blocks the response (CORS / network).
+  async function attempt(url, init) {
+    try {
+      const res = await fetch(url, init);
+      const text = await res.text();
+      return { ok: res.ok, status: res.status, body: text };
+    } catch (e) {
+      return { error: String(e) };
+    }
+  }
+  const describe = (r) => r.error ? `blocked: ${r.error}` : `HTTP ${r.status}\n${r.body.slice(0, 600)}`;
+  const redactToken = (body) => body.replace(/"access_token":"[^"]+"/, '"access_token":"<redacted>"');
+
+  $("form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    $("run").disabled = true;
+    $("out").textContent = "";
+    $("verdict").textContent = "";
+    const id = $("id").value.trim(), secret = $("secret").value.trim();
+    let token;
+
+    // 1. Basic auth header (what WclClient uses; needs a CORS preflight).
+    const basic = await attempt(TOKEN_URL, {
+      method: "POST",
+      headers: { Authorization: "Basic " + btoa(`${id}:${secret}`), "Content-Type": "application/x-www-form-urlencoded" },
+      body: "grant_type=client_credentials",
+    });
+    step("Token exchange, Basic auth header", basic.ok, redactToken(describe(basic)));
+    if (basic.ok) token = JSON.parse(basic.body).access_token;
+
+    // 2. Credentials in the form body (a "simple" request, no preflight).
+    const body = await attempt(TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "client_credentials", client_id: id, client_secret: secret }),
+    });
+    step("Token exchange, credentials in body", body.ok, redactToken(describe(body)));
+    if (!token && body.ok) token = JSON.parse(body.body).access_token;
+
+    // 3. GraphQL with the token.
+    let gql = { error: "skipped: no token" };
+    if (token) {
+      gql = await attempt(API_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "{ rateLimitData { limitPerHour pointsSpentThisHour pointsResetIn } }" }),
+      });
+    }
+    step("GraphQL rateLimitData", !!gql.ok, describe(gql));
+
+    const tokenOk = basic.ok || body.ok;
+    const verdict = tokenOk && gql.ok ? ["ok", "BYO-direct works from this origin: no worker needed."]
+      : !tokenOk && [basic, body].some((r) => r.error) ? ["bad", "Token exchange blocked by the browser → token-exchange worker needed."]
+      : !tokenOk ? ["bad", "Token exchange reached WCL but was rejected: check the client id/secret."]
+      : ["bad", "Token works, GraphQL failed: see step 3."];
+    $("verdict").className = verdict[0];
+    $("verdict").textContent = verdict[1];
+    $("run").disabled = false;
+  });
+</script>
+</body>
+</html>
