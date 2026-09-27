@@ -50,6 +50,8 @@ function slug(s: string): string {
 
 async function whoami() {
   const { client, tokens } = makeClient();
+  // Lengths only, never values: enough to spot a swapped or truncated secret.
+  console.log(`client id: ${process.env.WCL_CLIENT_ID!.trim().length} chars, secret: ${process.env.WCL_CLIENT_SECRET!.trim().length} chars`);
   await tokens();
   const expiresIn = tokens.lastResponse!.expires_in;
   console.log(`token ok: ${tokens.lastResponse!.token_type}, expires in ${expiresIn}s (~${Math.round(expiresIn / 86400)} days)`);
