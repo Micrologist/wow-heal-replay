@@ -219,10 +219,14 @@ Exit criteria: a checked-in `fixtures/<encounter>.json`, a committed decision in
 - Dead players produce no samples (gaps of minutes); alive players never went > 10 s without one in these fixtures, so `stale` is only exercised by synthetic tests.
 - Tick `i` = state at `i·100 ms` including only events ≤ that time; `at(t)` never shows the future.
 UI: a throwaway debug readout (slider + HP bars + death marks, `window.timeline`, `console.log(timeline.at(t))`) under the loaded fight; Milestone 3 replaces it with raid frames.
-### 3. Frames v0 — raid frames with moving health + deaths, scrubber, play/pause. This is the proof of concept; stop and look at it. ✅ built 2026-09-27, awaiting David's look
+### 3. Frames v0 — raid frames with moving health + deaths, scrubber, play/pause. This is the proof of concept; stop and look at it. ✅ 2026-09-27 (David: continue)
 `src/ui/replay.ts` = `controls/playback.ts` (play/pause, 0.25–8×, scrubber with clickable death markers → seek 3 s before, clock `m:ss.s / total`, keys: Space, ←/→ ±1 s, Shift ±10 s, 1–6 speed) + `frames/raidFrames.ts` (columns of 5, class-coloured fill via `scaleX`, outlined names, dead = grey + "Dead", stale = dimmed + "?"; only frames whose state changed are touched). Replaced the Milestone 2 debug readout; roster + event counts moved into collapsed `<details>`.
 Known gap: WCL doesn't give raid subgroups (needs `CombatantInfo` events, not fetched), so groups are filled by role order (tanks, healers, dps).
-### 4. Debuffs + absorbs on frames.
+### 4. Debuffs + absorbs on frames. ✅ 2026-09-27
+- **Absorbs:** the snapshot `absorb` (total shield, on every HP snapshot) is the authority, held like HP. An event-based per-shield tracker (apply/`absorbed`/remove) matched it within 5% only 44–57% of the time and ran low (median −1.3k: passive absorbs never appear as shield buffs), so it isn't used. Between snapshots a shield `applybuff`/`refreshbuff` adds its `absorb` immediately; the next snapshot resets to WCL's total. Drawn as a striped lighter segment after HP; if it exceeds missing HP, a white glow at the frame edge.
+- **Debuffs** (`src/model/debuffs.ts`): intervals per (target, ability, source) from apply/stack/refresh/remove; open at the pull → start 0, never removed → fight end. No durations in the log, so the sweep uses the real apply(or last refresh) → remove interval. Shown if from an enemy (not a player or their pet) and stacking or ≥ 5 s; per-encounter `src/data/encounters/<encounterID>.json` `debuffs.important` / `debuffs.ignore` override. Max 3 icons, pinned first, then most stacks, then soonest to drop. On the fixtures this keeps only boss mechanics (Splinters, Steady Strikes ≤49 stacks, Shredding Shards; Ritual Burn, Grasping Depths, Corpse Blight…) and drops Aftershock (0.3 s), Forbearance, Light of the Martyr, etc.
+- Not done: dispel-type borders. The log has no dispel type (ability `type` is the spell school); it would need a hand-kept ability → dispel type table.
+- Icons: `https://wow.zamimg.com/images/wow/icons/large/<icon>` (`masterData.abilities.icon` already ends in `.jpg`).
 ### 5. Casts + healer panel — now-casting readout and recent heals. Frame highlighting.
 ### 6. Cooldowns — spell tables for one spec first (whichever spec is in your own logs), then the rest.
 ### 7. Contribution view.

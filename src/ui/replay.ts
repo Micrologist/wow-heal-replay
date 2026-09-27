@@ -12,7 +12,7 @@ export interface Replay {
 
 export function createReplay(tl: Timeline): Replay {
   (window as unknown as { timeline: Timeline }).timeline = tl; // handy in the console
-  const frames = createRaidFrames(tl.actors);
+  const frames = createRaidFrames(tl.actors, tl.abilities);
   const summary = h("span", { class: "muted small" });
   let lastTick = -1;
   const playback: Playback = createPlayback({
