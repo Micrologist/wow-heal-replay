@@ -174,7 +174,15 @@ Fixtures are `fixtures/*.json.gz` (raw dump, gzipped; ~4.4 MB per 6–7 min Myth
 
 ### 0. Prove API access — for the agent *and* the site. ✅ Done 2026-09-27.
 
-Fixtures: Nek'zali the Soulcoiler Mythic kill (#16) + wipe (#15) from `368AMJNcyTLkrPvz`. Decision: BYO-direct (§3). Agent path: `wcl` workflow. Site path: Pages smoke page. Details below kept for reference.
+Fixtures (`fixtures/`, all Mythic, 20 players):
+| fixture | result | healers |
+|---|---|---|
+| Nek'zali the Soulcoiler `368AMJNcyTLkrPvz` #16 | kill, 1 death | Holy Priest, Resto Druid, Preservation Evoker, Mistweaver Monk |
+| Nek'zali the Soulcoiler `368AMJNcyTLkrPvz` #15 | wipe 4.96%, 23 deaths | same |
+| The Lost Explorers `t7Jz29RwvfQhYKLg` #40 | kill, 15 deaths | **Holy Paladin (Balotan)**, Resto Shaman, Preservation Evoker, Disc Priest |
+| The Lost Explorers `t7Jz29RwvfQhYKLg` #38 | wipe 0.23%, 23 deaths | **Holy Paladin (Balotan)**, Resto Shaman, Preservation Evoker |
+
+Holy Paladin is the first target spec (Milestone 6 spell table): use the Lost Explorers fixtures. Decision: BYO-direct (§3). Agent path: `wcl` workflow. Site path: Pages smoke page. Details below kept for reference.
 
 Exit criteria: a checked-in `fixtures/<encounter>.json`, a committed decision in this file (§3) on BYO-direct vs token-worker, and both paths exercised end to end.
 
