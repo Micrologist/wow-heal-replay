@@ -211,7 +211,14 @@ Exit criteria: a checked-in `fixtures/<encounter>.json`, a committed decision in
 
 ### 1. Fetch & list — paste report, fight list, IndexedDB cache. Nothing rendered yet. ✅ 2026-09-27
 `src/ui/app.ts`: credentials → report (URL/code, `#code=…&fight=…` hash) → fight list grouped by boss with pull numbers, kill/wipe %, duration, cached dot → load with progress bar → roster (healers from Summary `composition[].specs[].role`) + event counts. `src/api/fightData.ts` loads a fight as `FightData` (raw events flattened per dataType) through `src/api/cache.ts` (IndexedDB `fights` keyed `[code, fight.id]`, `reports` keyed by code; memory fallback). A cached fight re-opens with zero API requests; the report list is cached too, with a refresh link for live-logged reports. Tests: `fightDataFromDump` + `src/test/fixtures.ts` give model tests a `FightData` straight from a fixture.
-### 2. Timeline core — HP + deaths from Healing/DamageTaken, tests against a fixture. Print `timeline.at(t)` to console.
+### 2. Timeline core — HP + deaths from Healing/DamageTaken, tests against a fixture. Print `timeline.at(t)` to console. ✅ 2026-09-27
+`src/model/health.ts` + `src/model/timeline.ts`, verified against the fixtures:
+- HP snapshots come from **every** stream, not just Healing/DamageTaken: an event with `resourceActor` carries `hitPoints`/`maxHitPoints`/`absorb` of its source (`1`) or target (`2`); no `resourceActor` = no snapshot. Values are absolute and post-event.
+- The Deaths stream has only `death` events; there is no resurrect event. A resurrect is the first sample with HP > 0 at least 1 s after the death (real ones are 2.5–107 s later in the fixtures: battle rezzes).
+- Killing blows carry `hitPoints: 0` 0–50 ms before the `death`; some deaths have no 0 sample. HP occasionally exceeds max HP by ~1% → clamped.
+- Dead players produce no samples (gaps of minutes); alive players never went > 10 s without one in these fixtures, so `stale` is only exercised by synthetic tests.
+- Tick `i` = state at `i·100 ms` including only events ≤ that time; `at(t)` never shows the future.
+UI: a throwaway debug readout (slider + HP bars + death marks, `window.timeline`, `console.log(timeline.at(t))`) under the loaded fight; Milestone 3 replaces it with raid frames.
 ### 3. Frames v0 — raid frames with moving health + deaths, scrubber, play/pause. This is the proof of concept; stop and look at it.
 ### 4. Debuffs + absorbs on frames.
 ### 5. Casts + healer panel — now-casting readout and recent heals. Frame highlighting.
