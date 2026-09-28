@@ -31,7 +31,7 @@ Paste a Warcraft Logs report, pick a raid encounter, and watch it back from a he
    - left/center: raid frames in groups of 5, same layout as the addon.
    - right/bottom: one collapsible panel per healer.
    - toggle: contribution overlay (graph) instead of frames.
-5. Shareable state in the URL hash: `#code=…&fight=12&t=83.4&healer=Kaisa`.
+5. Shareable state in the URL hash: `#code=…&fight=12&t=83.4&healer=Kaisa` (`code`, `fight`, `healer` implemented; `t` pending).
 
 ---
 
@@ -227,7 +227,11 @@ Known gap: WCL doesn't give raid subgroups (needs `CombatantInfo` events, not fe
 - **Debuffs** (`src/model/debuffs.ts`): intervals per (target, ability, source) from apply/stack/refresh/remove; open at the pull → start 0, never removed → fight end. No durations in the log, so the sweep uses the real apply(or last refresh) → remove interval. Shown if from an enemy (not a player or their pet) and stacking or ≥ 5 s; per-encounter `src/data/encounters/<encounterID>.json` `debuffs.important` / `debuffs.ignore` override. Max 3 icons, pinned first, then most stacks, then soonest to drop. On the fixtures this keeps only boss mechanics (Splinters, Steady Strikes ≤49 stacks, Shredding Shards; Ritual Burn, Grasping Depths, Corpse Blight…) and drops Aftershock (0.3 s), Forbearance, Light of the Martyr, etc.
 - Not done: dispel-type borders. The log has no dispel type (ability `type` is the spell school); it would need a hand-kept ability → dispel type table.
 - Icons: `https://wow.zamimg.com/images/wow/icons/large/<icon>` (`masterData.abilities.icon` already ends in `.jpg`).
-### 5. Casts + healer panel — now-casting readout and recent heals. Frame highlighting.
+### 5. Casts + healer panel — now-casting readout and recent heals. Frame highlighting. ✅ 2026-09-28
+- **Casts** (`src/model/casts.ts`): `begincast`/`empowerstart` never has a target (`targetID: -1`), the completing `cast`/`empowerend` does, so an in-progress cast shows the target of the cast that completes it. `fake: true` = procs the player didn't press (Reclamation, Twin Flame, Soul Fragment) → ignored. A new begincast interrupts the pending one; an instant of another spell doesn't (off-GCD). Begin→cast pairs < 50 ms are instant procs that still log a begincast (20–30% of pairs; e.g. 32 of Balotan's 34 Flash of Light on #40), real cast times start ~300 ms. `empowerend` + echo `cast` counted once. Channels not special-cased yet.
+- **Heals** (`src/model/heals.ts`): effective = `heal.amount` + `absorbed.amount` (shield soak), pets/totems credited via `petOwner` (Healing Stream/Stormstream Totem ≈ 11M each for Goreki). Matches the Summary table `healingDone` within −0.6…+3.2% for all 8 healers (heals alone are 15–20% short); tested at 5%.
+- **Healer state** (`src/model/healers.ts`, `timeline.healerData.at(id, t)`): hard cast in progress (progress 0..1) or a 400 ms flash after an instant/finished cast; last 5 s of heals (≤ 8, newest first); cumulative healing + HPS; mana from `classResources` type 0 on the healer's snapshots.
+- **UI** (`src/ui/healerPanel/healerPanel.ts`): panel per healer next to the frames (stacked < 860 px): name/spec/HPS, mana bar, `[icon] Spell → Target` + cast bar (gold casting, green done, red interrupted), recent-heals feed (pooled rows). Panels update on every animation frame with the exact time (smooth bars); frames on tick change. Click a panel → selected: its cast target's frame pulses (restarts per cast), the healer's own frame gets a yellow edge, `&healer=Name` in the hash (restored on reload). Perf: 60 fps at 8× in headless Chromium; `timeline.at` ≈ 0.04 ms.
 ### 6. Cooldowns — spell tables for one spec first (whichever spec is in your own logs), then the rest.
 ### 7. Contribution view.
 ### 8. Polish — URL state, keyboard, speed, mobile-ish layout, error states (private report, bad code, rate limit, expired token).

@@ -17,6 +17,11 @@ export const iconUrl = (icon: string) => `https://wow.zamimg.com/images/wow/icon
 export interface RaidFrames {
   el: HTMLElement;
   update(state: TimelineState): void;
+  /** Pulse the frame the selected healer is casting on. `key` changes per cast so the pulse
+   * restarts when a new cast lands on the same target. */
+  highlight(targetID: number | null, key: string): void;
+  /** Mark the selected healer's own frame. */
+  markHealer(id: number | null): void;
 }
 
 /** WCL doesn't give raid subgroups (that needs CombatantInfo), so groups are filled in roster
@@ -65,8 +70,25 @@ export function createRaidFrames(players: Player[], abilities: Map<number, Abili
       return root;
     })));
 
+  let highlighted: { id: number | null; key: string } = { id: null, key: "" };
+  let markedHealer: number | null = null;
+
   return {
     el: h("div", { class: "raid-frames" }, ...columns),
+    highlight(targetID, key) {
+      if (targetID === highlighted.id && key === highlighted.key) return;
+      if (highlighted.id !== null) frames.get(highlighted.id)?.root.classList.remove("targeted");
+      highlighted = { id: targetID, key };
+      const f = targetID !== null ? frames.get(targetID) : undefined;
+      if (!f) return;
+      void f.root.offsetWidth; // restart the CSS pulse
+      f.root.classList.add("targeted");
+    },
+    markHealer(id) {
+      if (markedHealer !== null) frames.get(markedHealer)?.root.classList.remove("selected-healer");
+      markedHealer = id;
+      if (id !== null) frames.get(id)?.root.classList.add("selected-healer");
+    },
     update(state) {
       for (const a of state.actors) {
         const f = frames.get(a.id);
