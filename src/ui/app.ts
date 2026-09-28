@@ -112,7 +112,8 @@ export function startApp(root: HTMLElement, store: FightStore, persistentCache: 
     }
     reportStatus.textContent = "";
     state.cachedIDs = new Set(await store.cachedFightIDs(ref.code).catch(() => []));
-    setHash({ code: ref.code, fight: fightID });
+    const keep = parseHash(location.hash);
+    setHash({ code: ref.code, fight: fightID, healer: keep.fight === fightID ? keep.healer : undefined });
     renderFights();
     const fight = fightID !== undefined ? state.report.fights.find((f) => f.id === fightID) : undefined;
     if (fight) void openFight(fight);
@@ -161,7 +162,8 @@ export function startApp(root: HTMLElement, store: FightStore, persistentCache: 
     const report = state.report!;
     const seq = ++state.loadSeq;
     state.selectedFight = fight.id;
-    setHash({ code: report.code, fight: fight.id });
+    const keep = parseHash(location.hash);
+    setHash({ code: report.code, fight: fight.id, healer: keep.fight === fight.id ? keep.healer : undefined });
     renderFights();
 
     const bar = h("progress", { max: 1, value: 0 });
@@ -212,7 +214,11 @@ export function startApp(root: HTMLElement, store: FightStore, persistentCache: 
     const roster = buildRoster(data);
     const byRole = (role: Role) => roster.filter((p) => p.role === role);
     const total = Object.values(data.events).reduce((n, e) => n + e.length, 0);
-    replay = createReplay(buildTimeline(data, { debuffs: encounterData(data.fight.encounterID)?.debuffs }));
+    replay = createReplay(buildTimeline(data, { debuffs: encounterData(data.fight.encounterID)?.debuffs }), {
+      actorNames: new Map(data.report.masterData.actors.map((a) => [a.id, a.name])),
+      selectedHealer: parseHash(location.hash).healer,
+      onSelectHealer: (healer) => setHash({ code: data.code, fight: data.fight.id, healer: healer ?? undefined }),
+    });
     fightEl.replaceChildren(
       fightTitle(data.fight),
       h("p", { class: "muted small" },
@@ -251,7 +257,7 @@ export function startApp(root: HTMLElement, store: FightStore, persistentCache: 
     );
   }
 
-  function setHash(s: { code: string; fight?: number }) {
+  function setHash(s: { code: string; fight?: number; healer?: string }) {
     const hash = formatHash(s);
     if (location.hash !== hash) history.replaceState(null, "", hash || location.pathname);
   }

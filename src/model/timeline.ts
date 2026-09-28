@@ -23,7 +23,8 @@
 import type { FightData } from "../api/types.ts";
 import { collectDebuffs, type DebuffInterval, type EncounterDebuffConfig, isImportant, lastAppliedAt, stacksAt } from "./debuffs.ts";
 import { collectDeaths, collectHealthSamples, type Death, type HealthSample } from "./health.ts";
-import { buildRoster, type Player } from "./roster.ts";
+import { buildHealers, type Healers, type HealerState } from "./healers.ts";
+import { buildRoster, healers as healersOf, type Player } from "./roster.ts";
 
 export const TICK_MS = 100;
 export const STALE_MS = 10_000;
@@ -68,6 +69,8 @@ export interface TimelineState {
   alive: number;
   /** sum(hp) / sum(maxHp) over all tracked actors, dead counting as 0 */
   raidPct: number;
+  /** one per healer, in roster order */
+  healers: HealerState[];
 }
 
 export interface Timeline {
@@ -78,6 +81,9 @@ export interface Timeline {
   deaths: (Death & { name: string })[];
   /** name + icon for every ability id the log mentions */
   abilities: Map<number, Ability>;
+  /** the healers (roster role "healer"); their casts and heals live in `healerData` */
+  healers: Player[];
+  healerData: Healers;
   at(t: number): TimelineState;
 }
 
@@ -187,6 +193,8 @@ export function buildTimeline(data: FightData, opts: TimelineOptions = {}): Time
   const debuffsByActor = new Map<number, DebuffInterval[]>(actors.map((a) => [a.id, []]));
   for (const iv of collectDebuffs(data, ids)) if (isImportant(iv, debuffConfig)) debuffsByActor.get(iv.targetID)!.push(iv);
   const abilities = new Map(data.report.masterData.abilities.map((a) => [a.gameID, { name: a.name, icon: a.icon }]));
+  const healerPlayers = healersOf(actors);
+  const healerData = buildHealers(data, healerPlayers.map((p) => p.id));
 
   return {
     durationMs,
@@ -195,6 +203,8 @@ export function buildTimeline(data: FightData, opts: TimelineOptions = {}): Time
     actors,
     deaths: allDeaths.map((d) => ({ ...d, name: names.get(d.actorID)! })),
     abilities,
+    healers: healerPlayers,
+    healerData,
     at(t: number): TimelineState {
       const tick = Math.min(tickCount - 1, Math.max(0, Math.floor(t / tickMs)));
       let hpSum = 0;
@@ -219,7 +229,9 @@ export function buildTimeline(data: FightData, opts: TimelineOptions = {}): Time
           });
         return { id: a.id, hp, maxHp, pct: maxHp > 0 ? Math.min(1, hp / maxHp) : 0, absorb: tr.absorb[tick], dead, stale: (tr.flags[tick] & STALE) !== 0, debuffs };
       });
-      return { t: tick * tickMs, actors: states, alive, raidPct: maxSum > 0 ? hpSum / maxSum : 0 };
+      const snapped = tick * tickMs;
+      const healerStates = healerPlayers.map((p) => healerData.at(p.id, snapped));
+      return { t: snapped, actors: states, alive, raidPct: maxSum > 0 ? hpSum / maxSum : 0, healers: healerStates };
     },
   };
 }
